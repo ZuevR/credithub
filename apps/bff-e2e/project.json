@@ -1,0 +1,24 @@
+{
+  "name": "bff-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "implicitDependencies": [
+    "bff"
+  ],
+  "targets": {
+    "e2e": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/{e2eProjectRoot}"
+      ],
+      "dependsOn": [
+        "bff:build",
+        "bff:serve"
+      ],
+      "options": {
+        "jestConfig": "apps/bff-e2e/jest.config.cts",
+        "passWithNoTests": true
+      }
+    }
+  }
+}
