@@ -16,6 +16,11 @@ export default defineConfig(() => ({
         'watch': false,
         'globals': true,
         'environment': "jsdom",
+        // The library has no spec files at the moment (the generator's
+        // ui.spec.tsx was removed while splitting it into components). Without
+        // this, `vitest` exits non-zero on "No test files found" and the whole
+        // `test:all` run is red even though nothing is broken.
+        'passWithNoTests': true,
         'include': ["src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
         'reporters': ["default"],
         'coverage': {

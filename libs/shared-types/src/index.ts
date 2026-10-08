@@ -1,1 +1,2 @@
-export * from './lib/shared-types';
+export * from './lib/calculator';
+export * from './lib/credit';
