@@ -48,7 +48,9 @@
       ],
       "options": {
         "buildTarget": "core-api:build",
-        "runBuildTargetDependencies": false
+        "runBuildTargetDependencies": false,
+        "port": 3001,
+        "inspect": false
       },
       "configurations": {
         "development": {
@@ -57,6 +59,56 @@
         "production": {
           "buildTarget": "core-api:build:production"
         }
+      }
+    },
+    "migration:generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "typeorm-ts-node-commonjs migration:generate apps/core-api/src/db/migrations/{args.name} -d apps/core-api/src/db/data-source.ts",
+        "cwd": "{workspaceRoot}",
+        "env": {
+          "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
+        }
+      }
+    },
+    "migration:run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "typeorm-ts-node-commonjs migration:run -d apps/core-api/src/db/data-source.ts",
+        "cwd": "{workspaceRoot}",
+        "env": {
+          "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
+        }
+      }
+    },
+    "migration:revert": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "typeorm-ts-node-commonjs migration:revert -d apps/core-api/src/db/data-source.ts",
+        "cwd": "{workspaceRoot}",
+        "env": {
+          "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
+        }
+      }
+    },
+    "migration:show": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "typeorm-ts-node-commonjs migration:show -d apps/core-api/src/db/data-source.ts",
+        "cwd": "{workspaceRoot}",
+        "env": {
+          "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
+        }
+      }
+    },
+    "seed": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "command": "node dist/apps/core-api/seed.js",
+        "cwd": "{workspaceRoot}"
       }
     }
   }
