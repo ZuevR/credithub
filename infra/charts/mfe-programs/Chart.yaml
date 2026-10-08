@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mfe-programs
+description: SSR-раздел «Программы» (React + Rsbuild + Express)
+type: application
+version: 0.1.0
+appVersion: "0.0.1"

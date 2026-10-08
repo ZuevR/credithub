@@ -38,6 +38,17 @@ const app = express();
 const PORT = Number(process.env.PORT ?? 8106);
 const ROUTES = ['/programs', '/programs/', '/mfe/programs', '/mfe/programs/'];
 
+/**
+ * Проба живости для ingress.
+ *
+ * Отдельный дешёвый маршрут, а не проверка `/programs`: проба дёргается каждые
+ * несколько секунд, и делать на ней полный серверный рендер незачем. Проверяем
+ * процесс, а не результат рендера.
+ */
+app.get('/healthz', (_req, res) => {
+  res.type('text/plain').send('ok\n');
+});
+
 app.get(ROUTES, (_req, res) => {
   try {
     const { html } = render();
