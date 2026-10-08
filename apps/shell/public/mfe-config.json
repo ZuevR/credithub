@@ -1,0 +1,6 @@
+{
+  "providers": {
+    "mfe-credits": "http://localhost:8101/remoteEntry.js",
+    "mfe-calculator": "http://localhost:8104/remoteEntry.mjs"
+  }
+}

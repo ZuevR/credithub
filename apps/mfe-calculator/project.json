@@ -1,0 +1,110 @@
+{
+  "name": "mfe-calculator",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "prefix": "ch",
+  "sourceRoot": "apps/mfe-calculator/src",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/angular:webpack-browser",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/apps/mfe-calculator",
+        "index": "apps/mfe-calculator/src/index.html",
+        "main": "apps/mfe-calculator/src/main.ts",
+        "tsConfig": "apps/mfe-calculator/tsconfig.app.json",
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/mfe-calculator/public"
+          }
+        ],
+        "styles": [
+          "apps/mfe-calculator/src/styles.css"
+        ],
+        "customWebpackConfig": {
+          "path": "apps/mfe-calculator/webpack.config.ts"
+        }
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "500kb",
+              "maximumError": "1mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "4kb",
+              "maximumError": "8kb"
+            }
+          ],
+          "outputHashing": "none",
+          "customWebpackConfig": {
+            "path": "apps/mfe-calculator/webpack.prod.config.ts"
+          }
+        },
+        "development": {
+          "buildOptimizer": false,
+          "optimization": false,
+          "vendorChunk": true,
+          "extractLicenses": false,
+          "sourceMap": true,
+          "namedChunks": true
+        }
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "@nx/angular:dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "port": 8104,
+        "publicHost": "http://localhost:8104",
+        "headers": {
+          "Access-Control-Allow-Origin": "*"
+        }
+      },
+      "configurations": {
+        "production": {
+          "buildTarget": "mfe-calculator:build:production"
+        },
+        "development": {
+          "buildTarget": "mfe-calculator:build:development"
+        }
+      }
+    },
+    "extract-i18n": {
+      "executor": "@angular-devkit/build-angular:extract-i18n",
+      "options": {
+        "buildTarget": "mfe-calculator:build"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "serve-static": {
+      "continuous": true,
+      "executor": "@nx/web:file-server",
+      "defaultConfiguration": "production",
+      "options": {
+        "buildTarget": "mfe-calculator:build",
+        "port": 8104,
+        "watch": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "mfe-calculator:build:development"
+        },
+        "production": {
+          "buildTarget": "mfe-calculator:build:production"
+        }
+      }
+    }
+  }
+}

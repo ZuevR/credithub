@@ -1,12 +1,11 @@
 import { Component, Suspense, type ReactNode } from 'react';
-import { lazyProvider } from './mf';
 
 // ProviderBoundary catches the lazy() rejection that fires when a provider's
 // remoteEntry.js can't be fetched (provider not running, network error,
 // etc.). Without it any one missing provider unmounts the whole consumer
 // tree. React has no built-in functional error boundary so this is a class.
 // Wrap each <ProviderBoundary> in your router of choice if you need routing.
-class ProviderBoundary extends Component<
+export class ProviderBoundary extends Component<
   { children: ReactNode; name: string },
   { error: Error | null }
 > {
@@ -32,18 +31,3 @@ class ProviderBoundary extends Component<
     );
   }
 }
-
-const ProviderMfeCredits = lazyProvider('mfe-credits', 'App');
-
-export function App() {
-  return (
-    <main>
-      <h1>shell</h1>
-      <ProviderBoundary name="mfe-credits">
-        <ProviderMfeCredits />
-      </ProviderBoundary>
-    </main>
-  );
-}
-
-export default App;

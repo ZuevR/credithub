@@ -1,10 +1,13 @@
-// Exposed by the federation plugin as 'mfe-credits/App'.
-// Consumers render it lazily via `lazyProvider('mfe-credits', 'App')`.
+import { CreditsApp } from './credits-app';
+
+// Standalone entry for this provider (see src/bootstrap.tsx). The shell never
+// renders this - it loads the exposed './CreditsApp' directly - so keep the two
+// in sync by delegating rather than duplicating markup.
 export function App() {
   return (
-    <section data-testid="mfe-credits">
-      <h1>Hello from mfe-credits</h1>
-    </section>
+    <main>
+      <CreditsApp />
+    </main>
   );
 }
 
