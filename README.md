@@ -515,6 +515,45 @@ kubectl -n credithub exec postgres-0 -- psql -U credithub -d credithub -c '\l'
 - Порты 80/443 не видны в `ss` как слушатели: ServiceLB в k3s проксирует их через
   iptables, а не биндится процессом.
 
+## Стенд (k3s)
+
+Приложение развёрнуто в кластере на домашнем ПК и доступно по адресу:
+
+**<http://192.168.1.187/>**
+
+| Путь | Что показывает |
+|---|---|
+| `/` | shell: обзор и меню |
+| `/credits` | React-remote: портфель кредитов (данные из BFF) |
+| `/calculator` | Angular-remote: калькулятор платежа |
+| `/programs` | SSR-раздел «Программы» (серверный рендер) |
+| `/api/*` | BFF — единственная точка API для фронта |
+
+Авторизации пока нет, вход не требуется.
+
+**Управление стендом** (нужен kubeconfig, см. «Доступ к кластеру с рабочей машины»):
+
+```sh
+export KUBECONFIG=$HOME/.kube/credithub.yaml
+
+kubectl -n credithub get pods,svc,ingress   # что развёрнуто
+helm list -n credithub                      # релизы
+kubectl -n credithub logs deploy/bff -f     # логи сервиса
+```
+
+**Адреса remote'ов** для shell задаются ConfigMap'ом, а не сборкой:
+
+```sh
+kubectl -n credithub get configmap shell-mfe-config -o jsonpath='{.data.mfe-config\.json}'
+```
+
+**Как обновить сервис** (образы собираются на самой машине — кросс-сборка невозможна):
+
+1. скопировать изменённые файлы в `~/credithub` на машине;
+2. `docker build -f infra/docker/<сервис>.Dockerfile -t credithub/<сервис>:dev .` там же;
+3. `docker tag … ghcr.io/zuevr/credithub-<сервис>:dev && docker push …`;
+4. `helm upgrade <сервис> infra/charts/<сервис> -n credithub`.
+
 ## Известные особенности
 
 - **Авторизации пока нет.** Владелец портфеля определяется константой
