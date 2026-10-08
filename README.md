@@ -320,10 +320,30 @@ helm upgrade --install postgres infra/charts/postgres --namespace credithub --wa
 ```
 
 База доступна внутри кластера как `postgres.credithub.svc.cluster.local:5432` и **не
-выставлена наружу**. Для миграций и отладки — port-forward:
+выставлена наружу**. Схема и демо-данные применяются к ней теми же командами, что и к
+локальной базе, но через туннель.
+
+**Доступ с рабочей машины — двухступенчатый**, потому что на хосте порт базы не слушает:
 
 ```sh
-kubectl -n credithub port-forward svc/postgres 5433:5432
+# 1) на машине с кластером: проброс из кластера на её localhost
+#    (setsid - иначе проброс умрёт вместе с SSH-сессией)
+setsid nohup kubectl -n credithub port-forward svc/postgres 15433:5432 \
+  >/tmp/pf.log 2>&1 < /dev/null &
+
+# 2) со своей машины: туннель до этого проброса
+ssh -N -L 15433:127.0.0.1:15433 romanzuev@192.168.1.187
+
+# 3) схема и данные
+DATABASE_URL="postgres://credithub:<пароль>@127.0.0.1:15433/credithub" \
+  yarn nx run core-api:migration:run
+DATABASE_URL="postgres://credithub:<пароль>@127.0.0.1:15433/credithub" \
+  yarn nx run core-api:seed
+```
+
+Пароль:
+
+```sh
 kubectl -n credithub get secret postgres-credentials \
   -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d
 ```
