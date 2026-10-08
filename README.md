@@ -1,96 +1,297 @@
-# Credithub
+# CreditHub
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+Учебный проект: личный кабинет банковского клиента с портфелем кредитов, собранный
+на микрофронтендах.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+Смысл проекта — потренироваться на честной гетерогенности: **три remote-приложения
+на разных фреймворках и разных сборщиках** живут в одном интерфейсе, публичный
+раздел отдаётся серверным рендером, а данные приходят из PostgreSQL через BFF и
+доменный сервис. Ничего из этого не «понарошку»: у каждого сервиса свой стек,
+своя сборка и свой деплой.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+---
 
-## Run tasks
+## Содержание
 
-To run tasks with Nx use:
+- [Как это устроено](#как-это-устроено)
+- [Технологии](#технологии)
+- [Модули](#модули)
+- [Требования](#требования)
+- [Запуск](#запуск)
+- [База данных](#база-данных)
+- [Проверки и разработка](#проверки-и-разработка)
+- [Известные особенности](#известные-особенности)
+- [Документация проекта](#документация-проекта)
 
-```sh
-npx nx <target> <project-name>
+---
+
+## Как это устроено
+
+Вход один — ingress на `:8080`. Он повторяет прод-схему маршрутизации (в k3s её
+играет Traefik):
+
+```
+                        ┌──────────────────────┐
+                        │  ingress  :8080      │
+                        └──────────┬───────────┘
+             ┌─────────────────────┼──────────────────────┐
+             ▼                     ▼                      ▼
+     /programs,            /api/*                  всё остальное
+     /mfe/programs/*          │                         │
+             │                ▼                         ▼
+             ▼          BFF  :3000  ──HTTP──▶   shell  :8100
+   mfe-programs SSR              │              (SPA + оркестрация)
+        :8106                    ▼
+                          core-api  :3001
+                                │
+                                ▼
+                        PostgreSQL  :5433
 ```
 
-For example:
+Ключевые решения:
+
+- **Shell не знает адресов remote'ов на этапе сборки.** Провайдеры перечислены в
+  `apps/shell/public/mfe-config.json` и регистрируются в рантайме
+  (`registerRemotes` / `loadRemote`). Один и тот же бандл shell работает в любом
+  окружении — меняется только конфиг.
+- **Граница между BFF и core-api настоящая:** BFF ходит в core-api по HTTP, а не
+  в общую базу. Наружу через ingress выставлен только BFF — фронт не имеет
+  доступа к доменному сервису.
+- **Публичный раздел — отдельный сервис, а не remote.** «Программы» отдаются
+  серверным рендером со своего документа и своей темы, поэтому в меню shell это
+  обычная ссылка, а не переход внутри SPA.
+- **Тема одна на разные фреймворки.** Shell публикует дизайн-токены как
+  CSS-переменные (`--ch-*`), а React- и Angular-приложения только ссылаются на
+  них — ни одно из них не владеет стилями другого.
+
+---
+
+## Технологии
+
+| Слой | Технология | Версия |
+|---|---|---|
+| Монорепозиторий | Nx | 23.3.0 |
+| Пакетный менеджер | Yarn (Berry, `node-modules`) | 4.5.0 |
+| Язык | TypeScript | 6.0.3 |
+| UI-библиотека | React | 19 |
+| Компоненты | MUI + Emotion | 9.4 / 11.14 |
+| Второй фреймворк | Angular (zoneless) | 22.2.1 |
+| Микрофронтенды | Module Federation (`@module-federation/enhanced`) | 2.9.2 |
+| Сборка React | Rspack | 2.2.8 |
+| Сборка SSR-раздела | Rsbuild | 2.2.12 |
+| Сборка Angular | webpack (`@nx/angular`) | — |
+| Серверный рендер | `react-dom/server` + Express | 5 |
+| Бэкенд | NestJS | 11 |
+| ORM | TypeORM | 1.1.2 |
+| БД | PostgreSQL | 17.5 |
+| Серверное состояние | TanStack Query | 5 |
+
+---
+
+## Модули
+
+| Модуль | Стек | Порт | Что делает |
+|---|---|---|---|
+| `apps/shell` | React + Rspack | 8100 | Каркас приложения: меню, маршруты, тема, рантайм-реестр провайдеров |
+| `apps/mfe-credits` | React + Rspack | 8101 | Портфель кредитов клиента, данные из BFF через TanStack Query |
+| `apps/mfe-calculator` | Angular + webpack | 8104 | Калькулятор аннуитетного платежа. Монтируется в React через контракт `mount(element)` |
+| `apps/mfe-programs` | React + Rsbuild + Express | 8105 (dev) / **8106** (SSR) | Публичный каталог программ с серверным рендером и гидратацией |
+| `apps/bff` | NestJS | 3000 | Единственная точка API для фронта: `/api/*`. Проксирует доменные данные |
+| `apps/core-api` | NestJS + TypeORM | 3001 | Доменная логика и доступ к PostgreSQL |
+| `libs/ui` | React + MUI | — | Общие компоненты (`PageHeader`, `WidgetShell`), тема, настройки запросов |
+| `libs/design-tokens` | TypeScript | — | Цвета, отступы, типографика и генерация CSS-переменных |
+| `libs/shared-types` | TypeScript | — | Контракты API (`CreditDto`, `ProgramDto`), деньги, общий расчёт аннуитета |
+| `tools/dev-ingress.mjs` | Node + Express | 8080 | Локальный ingress: маршрутизация как в проде |
+
+**Про деньги.** Все суммы передаются в минорных единицах (копейках) целым числом
+— так же, как хранятся в базе. Дробные рубли в `float` дают ошибки округления при
+суммировании портфеля, а конвертация «рубли ↔ копейки» на каждом слое — источник
+расхождений. Форматирование в `1 250 000 ₽` — задача UI.
+
+---
+
+## Требования
+
+- **Node.js 24** (проверено на 24.21)
+- **Yarn 4.5** — поставляется через `packageManager` в `package.json`, ставить
+  глобально не нужно
+- **Docker** с запущенным демоном — для PostgreSQL
+
+---
+
+## Запуск
+
+### 1. Зависимости
 
 ```sh
-npx nx build myproject
+yarn install
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-To install a new plugin you can use the `nx add` command. Here's an example of adding the React plugin:
-```sh
-npx nx add @nx/react
-```
-
-Use the plugin's generator to create new projects. For example, to create a new React app or library:
+### 2. Переменные окружения
 
 ```sh
-# Generate an app
-npx nx g @nx/react:app demo
-
-# Generate a library
-npx nx g @nx/react:lib some-lib
+cp .env.example .env
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+В `.env` уже прописаны рабочие значения для локального запуска. Важная деталь:
+`CORE_API_URL` **обязан включать префикс `/api`** (`http://localhost:3001/api`) —
+core-api регистрирует все маршруты под ним. Без префикса BFF получает 404 на
+каждом запросе.
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
+### 3. База данных
 
 ```sh
-npx nx connect
+docker compose up -d
 ```
 
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
-
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
+Поднимается PostgreSQL 17 на порту **5433**. Дождитесь статуса `healthy`:
 
 ```sh
-npx nx g ci-workflow
+docker compose ps
 ```
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### 4. Схема и демо-данные
 
-## Install Nx Console
+```sh
+yarn nx run core-api:migration:run   # создать таблицы
+yarn nx run core-api:seed            # загрузить демо-данные
+```
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+Seed идемпотентен: повторный запуск ничего не сделает, если данные уже есть.
+Загружается клиент, три кредитные программы и три кредита с графиками платежей
+(312 платежей, 42 из них внесены).
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+### 5. Приложения
 
-## Useful links
+Фронт и бэкенд запускаются **в двух терминалах**:
 
-Learn more:
+```sh
+# терминал 1: shell, mfe-credits, mfe-calculator
+yarn dev:front
 
-- [Learn more about this workspace setup](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+# терминал 2: BFF и core-api
+yarn dev:back
+```
 
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+Публичный SSR-раздел запускается отдельно (третьим терминалом), потому что у него
+свой сервер:
+
+```sh
+yarn dev:ssr          # сборка клиента и сервера + Express на :8106
+```
+
+### 6. Ingress
+
+```sh
+yarn dev:ingress      # :8080
+```
+
+**Открывайте приложение через ingress: <http://localhost:8080>.** Прямые порты
+тоже работают (например, <http://localhost:8100> для shell), но именно ingress
+повторяет прод-схему: `/programs` уходит в SSR-сервис, `/api/*` — в BFF.
+
+---
+
+## База данных
+
+| Команда | Что делает |
+|---|---|
+| `docker compose up -d` | Поднять PostgreSQL |
+| `docker compose ps` | Проверить статус (`healthy`) |
+| `docker compose down` | Остановить (данные сохранятся в томе) |
+| `docker compose down -v` | Остановить и **удалить данные** |
+| `yarn nx run core-api:migration:run` | Применить миграции |
+| `yarn nx run core-api:migration:revert` | Откатить последнюю миграцию |
+| `yarn nx run core-api:migration:show` | Показать статус миграций |
+| `yarn nx run core-api:migration:generate --name=Имя` | Сгенерировать миграцию по изменениям сущностей |
+| `yarn nx run core-api:seed` | Загрузить демо-данные |
+
+Подключиться к базе напрямую:
+
+```sh
+docker compose exec postgres psql -U credithub -d credithub
+```
+
+Команды работы с базой помечены как некэшируемые (`cache: false`). Это важно для
+`migration:show`: это запрос состояния, и с кэшем Nx он мог бы показать статус
+на момент предыдущего запуска. По той же причине `migration:run` не может
+«пройти успешно», не тронув базу.
+
+**Почему порт 5433, а не 5432.** 5432 — стандартный порт PostgreSQL, и на машине
+разработчика почти всегда уже что-то на нём висит. Проект занимает 5433, чтобы не
+конфликтовать с локальной установкой или другим контейнером. Если меняете порт —
+поправьте `DATABASE_URL` в `.env`.
+
+Данные лежат в именованном томе `credithub-pgdata` и переживают перезапуск
+контейнера. Схема меняется **только миграциями**: `synchronize` выключен, чтобы
+TypeORM не переписывал таблицы молча.
+
+---
+
+## Проверки и разработка
+
+```sh
+yarn build:all    # сборка всех шести проектов
+yarn lint:all     # линт семи проектов
+yarn test:all     # тесты
+yarn nx graph     # граф зависимостей проектов
+```
+
+Запуск отдельного проекта:
+
+```sh
+yarn nx run mfe-programs:dev      # dev-сервер Rsbuild (:8105), отладка CSR-версии
+yarn nx run core-api:serve        # core-api с пересборкой
+yarn nx serve <project>           # любой проект
+```
+
+### Полная таблица портов
+
+| Порт | Сервис | Команда запуска |
+|---|---|---|
+| 8080 | ingress — точка входа | `yarn dev:ingress` |
+| 8100 | shell | `yarn dev:front` |
+| 8101 | mfe-credits | `yarn dev:front` |
+| 8104 | mfe-calculator | `yarn dev:front` |
+| 8105 | mfe-programs, dev-сервер Rsbuild | `yarn nx run mfe-programs:dev` |
+| 8106 | mfe-programs, SSR-сервер | `yarn dev:ssr` |
+| 3000 | BFF | `yarn dev:back` |
+| 3001 | core-api | `yarn dev:back` |
+| 5433 | PostgreSQL | `docker compose up -d` |
+
+### Быстрая проверка, что всё живо
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/credits
+curl -s http://localhost:8080/api/credits | head -c 200
+curl -s http://localhost:8080/programs | grep -c 'programs-section'   # SSR: разметка в исходном HTML
+```
+
+---
+
+## Известные особенности
+
+- **Авторизации пока нет.** Владелец портфеля определяется константой
+  `DEMO_CLIENT_ID` в `core-api`. Когда появится Keycloak/OIDC, идентификатор
+  придёт из токена, а форма вызова сервиса не изменится.
+- **HMR не обновляет код remote в смонтированном хосте** — после правок в remote
+  нужна перезагрузка страницы. Собственный HMR shell работает.
+- **Относительные пути к API.** Фронт обращается к `/api/*` без хоста: в dev его
+  проксирует дев-сервер, в проде — ingress. Адреса бэкенда в приложениях нет
+  намеренно.
+- **SSR-раздел не использует федерацию.** Публичный раздел — самостоятельный
+  сервис со своим документом; кросс-бандлерная загрузка Rsbuild-remote была
+  проверена и задокументирована, но в текущей архитектуре не нужна.
+- **`uuid-ossp`** уже включён в образе PostgreSQL, поэтому миграции работают без
+  отдельного `CREATE EXTENSION`. Для «голого» Postgres этот шаг понадобится.
+
+---
+
+## Документация проекта
+
+| Файл | О чём |
+|---|---|
+| [PROJECT.md](PROJECT.md) | Архитектурные решения и их обоснование, схема инфраструктуры |
+| [PLAN.md](PLAN.md) | Маршрут разработки по шагам с критериями приёмки |
+| [PROGRESS.md](PROGRESS.md) | Журнал работы: что сделано, что проверено, какие грабли найдены |
+| [AGENTS.md](AGENTS.md) | Правила работы агента в этом репозитории |

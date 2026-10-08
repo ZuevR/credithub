@@ -69,7 +69,8 @@
         "env": {
           "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
         }
-      }
+      },
+      "cache": false
     },
     "migration:run": {
       "executor": "nx:run-commands",
@@ -79,7 +80,8 @@
         "env": {
           "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
         }
-      }
+      },
+      "cache": false
     },
     "migration:revert": {
       "executor": "nx:run-commands",
@@ -89,7 +91,8 @@
         "env": {
           "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
         }
-      }
+      },
+      "cache": false
     },
     "migration:show": {
       "executor": "nx:run-commands",
@@ -99,7 +102,8 @@
         "env": {
           "TS_NODE_PROJECT": "apps/core-api/tsconfig.app.json"
         }
-      }
+      },
+      "cache": false
     },
     "seed": {
       "executor": "nx:run-commands",
@@ -109,7 +113,8 @@
       "options": {
         "command": "node dist/apps/core-api/seed.js",
         "cwd": "{workspaceRoot}"
-      }
+      },
+      "cache": false
     }
   }
 }
