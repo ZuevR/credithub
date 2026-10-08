@@ -266,6 +266,30 @@ Dockerfile, чтобы не повторять попытку.
   базой, что развёрнута в кластере;
 - в образе только `dist`, `node_modules` и `package.json`.
 
+### mfe-calculator в кластере (готово)
+
+Angular-remote развёрнут тем же способом: сборка webpack'ом, раздача nginx,
+Ingress `/mfe/calculator`. Образ `ghcr.io/zuevr/credithub-mfe-calculator`.
+
+**Главное отличие от React-remote - MIME для `.mjs`.** Angular отдаёт ES-модуль
+`remoteEntry.mjs`, а в стандартном `mime.types` образа `nginx:alpine` **расширения
+`mjs` нет** (проверено: `grep mjs /etc/nginx/mime.types` → 0 совпадений). При этом
+браузер строго проверяет MIME для ES-модулей и отказывается исполнять файл, отданный
+как `application/octet-stream`. Поэтому Dockerfile патчит `mime.types`
+(`application/javascript ... js mjs;`), а **отдельный шаг сборки проверяет, что патч
+применился** - иначе ошибка всплыла бы только в браузере и выглядела бы как «модуль не
+загрузился». Проверено на живом сервисе: `Content-Type: application/javascript`.
+
+**Проверено, что remote работает как федеративный модуль** (для ESM это делается
+динамическим `import()`, а не тегом script): `remoteEntry.mjs` экспортирует `init` и
+`get`; `init({})` выполняется; `get('./mount')` возвращает фабрику; при этом
+загрузились чанки `__federation_expose_mount.js`, `common.js`, `799.js` и другие - все
+200. Ошибок в консоли нет.
+
+**Побочно:** сборка Angular на этой машине заняла ~15 секунд (быстрее, чем ожидалось
+для i5), а образ получился таким же компактным, как у React-remote, потому что в
+финальной стадии тоже nginx.
+
 ### mfe-credits в кластере (готово)
 
 Первый remote развёрнут: образ `ghcr.io/zuevr/credithub-mfe-credits`, чарт

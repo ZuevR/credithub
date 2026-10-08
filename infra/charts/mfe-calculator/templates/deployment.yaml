@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mfe-calculator
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: mfe-calculator
+    app.kubernetes.io/part-of: credithub
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mfe-calculator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mfe-calculator
+        app.kubernetes.io/part-of: credithub
+    spec:
+      # Kubernetes иначе создаст docker-link переменные для сервисов namespace;
+      # нашему коду они не нужны, а конфликт имён уже приводил к падению BFF.
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mfe-calculator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

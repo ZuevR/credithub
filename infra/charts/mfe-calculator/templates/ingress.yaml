@@ -1,0 +1,24 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mfe-calculator
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: mfe-calculator
+    app.kubernetes.io/part-of: credithub
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    # Без `host`: обращаемся по IP хоста. Префикс НЕ срезается - приложение
+    # отдаётся nginx'ом ровно по этому пути.
+    - http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: mfe-calculator
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

@@ -359,6 +359,27 @@ Remote'ы (`mfe-credits`, `mfe-calculator`) — это статика, поэт�
 чанки запрашиваются по тому же префиксу и nginx их находит без дополнительной
 настройки.
 
+### Angular-remote и MIME для `.mjs`
+
+Angular отдаёт ES-модуль `remoteEntry.mjs`, а в стандартном `mime.types` образа
+`nginx:alpine` расширения `mjs` **нет**. Браузер строго проверяет MIME для модулей и
+отказывается исполнять файл с `application/octet-stream`, поэтому Dockerfile патчит
+`mime.types`:
+
+```dockerfile
+RUN sed -i 's#\(application/javascript[[:space:]]*\)js;#\1js mjs;#' /etc/nginx/mime.types
+```
+
+Сборка отдельно проверяет, что патч применился (`grep -q 'js mjs;'`): иначе ошибка
+всплыла бы только в браузере и выглядела бы как «модуль не загрузился».
+
+Проверить MIME можно так:
+
+```sh
+curl -s -o /dev/null -w '%{content_type}\n' http://<host>/mfe/calculator/remoteEntry.mjs
+# ожидается application/javascript
+```
+
 ### Имена переменных окружения и Kubernetes
 
 Kubernetes **сам создаёт переменные для каждого Service** в namespace в стиле
