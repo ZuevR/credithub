@@ -37,10 +37,10 @@
 - секреты (пароль БД) создаются руками через `kubectl`, в git их нет.
 
 **Состояние рабочего места:**
-- локальное окружение разработки **сейчас запущено** (`yarn dev:all`) и локальный
-  PostgreSQL в docker-compose (порт 5433) — остановить: `Ctrl+C` в задаче и
-  `docker compose down`;
-- **как поднять локальное окружение после паузы:** `docker compose up -d`, затем
+- **локальное окружение остановлено** (по просьбе): приложение, ingress и PostgreSQL в
+  docker-compose. Все порты свободны, процессов не осталось, контейнер удалён, **данные
+  сохранены в томе** `credithub_credithub-pgdata`;
+- **как поднять локальное окружение заново:** `docker compose up -d`, затем
   `yarn nx run core-api:migration:run` и `yarn nx run core-api:seed` (если база пустая),
   затем `yarn dev:all` — поднимает всё и ingress, останавливается одним `Ctrl+C`;
   открывать `http://localhost:8080/`;
