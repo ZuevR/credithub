@@ -1,0 +1,33 @@
+{
+  "name": "mfe-programs",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/mfe-programs/src",
+  "projectType": "application",
+  "tags": [],
+  "// targets": "build/dev/preview/typecheck/lint инферируются плагином @nx/rsbuild",
+  "targets": {
+    "build-server": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "rsbuild build -c rsbuild.config.server.ts",
+        "cwd": "apps/mfe-programs"
+      }
+    },
+    "build-ssr": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build", "build-server"],
+      "options": {
+        "command": "echo \"SSR-сборки готовы: dist/client + dist/server\""
+      }
+    },
+    "serve-ssr": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["build-ssr"],
+      "options": {
+        "command": "node server.mjs",
+        "cwd": "apps/mfe-programs"
+      }
+    }
+  }
+}
