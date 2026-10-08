@@ -1,0 +1,31 @@
+# Локальная инфраструктура для разработки.
+#
+# Порт 5433, а не дефолтный 5432: на машине может быть свой PostgreSQL
+# (в том числе контейнер `local-postgres-17`), и занимать стандартный порт
+# ради проекта - значит гарантированно получить конфликт.
+#
+# Запуск:  docker compose up -d
+# Проверка: docker compose exec postgres pg_isready -U credithub
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    container_name: credithub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: credithub
+      POSTGRES_PASSWORD: credithub
+      POSTGRES_DB: credithub
+    ports:
+      - '5433:5432'
+    volumes:
+      - credithub-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Без healthcheck `docker compose up -d` возвращает управление раньше,
+      # чем база готова принимать соединения, и первый же запрос падает.
+      test: ['CMD-SHELL', 'pg_isready -U credithub -d credithub']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  credithub-pgdata:

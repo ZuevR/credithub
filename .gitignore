@@ -1,7 +1,16 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
+# локальное окружение (в репозиторий попадает только .env.example)
+.env
+.env.local
+
 # compiled output
+*.tsbuildinfo
 dist
+# артефакты Module Federation (диагностика и сгенерированные типы)
+.mf
+@mf-types
+@mf-types.zip
 tmp
 out-tsc
 
@@ -50,3 +59,5 @@ vitest.config.*.timestamp*
 .yarn/install-state.gz
 .yarn/unplugged
 .pnp.*
+
+.angular

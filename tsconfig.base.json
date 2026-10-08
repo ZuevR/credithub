@@ -26,6 +26,9 @@
       ],
       "@credithub/ui": [
         "./libs/ui/src/index.ts"
+      ],
+      "mfe_calculator/mount": [
+        "./apps/mfe-calculator/src/mount.ts"
       ]
     }
   },
