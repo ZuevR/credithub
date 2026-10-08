@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-api
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: core-api
+    app.kubernetes.io/part-of: credithub
+spec:
+  # ClusterIP, а не NodePort/LoadBalancer: наружу этот сервис не выставляется.
+  # Единственный потребитель - BFF, и в схеме PROJECT.md к core-api ведёт только
+  # он. Наружу торчит ingress с BFF и SSR-разделом.
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: core-api
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http

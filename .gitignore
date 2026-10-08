@@ -3,6 +3,7 @@
 # локальное окружение (в репозиторий попадает только .env.example)
 .env
 infra/.env.infra
+infra/.ghcr-token
 .env.local
 
 # compiled output

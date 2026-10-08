@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-api
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: core-api
+    app.kubernetes.io/part-of: credithub
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: core-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: core-api
+        app.kubernetes.io/part-of: credithub
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: core-api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            # Пароль берём из уже существующего секрета, а не дублируем в новом.
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: POSTGRES_PASSWORD
+            # Kubernetes подставляет $(POSTGRES_PASSWORD) в значение переменной,
+            # если она объявлена выше в этом же контейнере. Так строка подключения
+            # собирается без второго секрета с продублированным паролем.
+            - name: DATABASE_URL
+              value: "postgres://{{ .Values.database.user }}:$(POSTGRES_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+          # У core-api нет отдельного /health: корень под префиксом /api отвечает
+          # приложением. Этого достаточно, потому что TypeORM подключается к базе
+          # на старте - если база недоступна, процесс не поднимется вовсе.
+          readinessProbe:
+            httpGet:
+              path: /api
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

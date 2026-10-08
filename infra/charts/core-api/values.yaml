@@ -1,0 +1,33 @@
+# Образ берётся из GHCR: k3s использует containerd, и собранный локально в Docker
+# образ ему не виден, поэтому образ публикуется в реестр.
+image:
+  repository: ghcr.io/zuevr/credithub-core-api
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# Реестр приватный, поэтому нужен pull-секрет. Создаётся вручную из токена GHCR
+# (см. README) - чтобы токен не лежал в чарте.
+# Именно список объектов: Kubernetes ожидает `{name: ...}`, и строка вместо
+# объекта приводит к ошибке разбора манифеста, а не к понятному сообщению.
+imagePullSecrets:
+  - name: ghcr-pull
+
+replicaCount: 1
+
+database:
+  # Secret уже создан для postgres; пароль переиспользуется, а не дублируется.
+  secretName: postgres-credentials
+  host: postgres.credithub.svc.cluster.local
+  port: 5432
+  name: credithub
+  user: credithub
+
+service:
+  port: 3001
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    memory: 512Mi

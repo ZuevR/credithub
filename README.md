@@ -316,6 +316,27 @@ QEMU падает на `nx build` с `Segmentation fault`, хотя обычны
 `dist/package.json`: в нём **отсутствует `pg`**, и установка по списку оставила бы
 рантайм без драйвера базы. Плата — размер образа.
 
+### Реестр образов (GHCR)
+
+k3s использует containerd, поэтому образ, собранный в Docker на хосте, кластеру не
+виден — образы публикуются в GHCR.
+
+```sh
+# 1) токен GitHub с правом write:packages (классический PAT)
+echo "<TOKEN>" | docker login ghcr.io -u <username> --password-stdin
+
+# 2) владелец в имени образа — в НИЖНЕМ регистре, это требование GHCR
+docker tag credithub/core-api:dev ghcr.io/<username>/credithub-core-api:dev
+docker push ghcr.io/<username>/credithub-core-api:dev
+
+# 3) доступ кластера к приватному реестру
+kubectl -n credithub create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io --docker-username=<username> --docker-password=<TOKEN>
+```
+
+`imagePullSecrets` в чарте должен быть **списком объектов** (`- name: ghcr-pull`), а не
+строк: `helm template` список строк пропускает, а API-сервер отвергает манифест.
+
 ### Сервисы в кластере
 
 Сервисы разворачиваются чартами из `infra/charts/`. Namespace — **отдельный чарт**:

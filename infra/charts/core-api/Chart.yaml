@@ -1,0 +1,6 @@
+apiVersion: v2
+name: core-api
+description: Доменный сервис CreditHub (NestJS + TypeORM)
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
