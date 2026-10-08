@@ -6,6 +6,9 @@ infra/.env.infra
 infra/.ghcr-token
 .env.local
 
+# Личный журнал учебного прогона: ведётся локально, в репозиторий не попадает
+HOMEWORK.md
+
 # compiled output
 *.tsbuildinfo
 dist
