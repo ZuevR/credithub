@@ -266,6 +266,38 @@ Dockerfile, чтобы не повторять попытку.
   базой, что развёрнута в кластере;
 - в образе только `dist`, `node_modules` и `package.json`.
 
+### mfe-credits в кластере (готово)
+
+Первый remote развёрнут: образ `ghcr.io/zuevr/credithub-mfe-credits`, чарт
+`infra/charts/mfe-credits`, Ingress на `/mfe/credits`.
+
+**Remote'ы раздаются иначе, чем сервисы:** здесь нет Node-процесса, только статика,
+поэтому финальная стадия образа - `nginx:alpine`. Это дало **95 МБ** против 1.8 ГБ у
+Node-образов core-api и BFF. Первая стадия (сборка) одинаковая.
+
+**Traefik НЕ срезает префикс пути.** Запрос `/mfe/credits/remoteEntry.js` доходит до
+nginx целиком, поэтому приложение отдаётся через `alias` под префиксом
+(`infra/docker/nginx/mfe-credits.conf`), плюс редирект `/mfe/credits` →
+`/mfe/credits/`: без завершающего слэша относительные ссылки в `index.html` уехали бы.
+Альтернатива - middleware `StripPrefix`, но это лишний ресурс. `publicPath: 'auto'`
+в rspack сам выводит базовый путь из URL `remoteEntry.js`, поэтому чанки запрашиваются
+по тому же префиксу и nginx их находит.
+
+Добавлен `Access-Control-Allow-Origin: *`: shell может быть открыт с другого адреса,
+и тогда загрузка remote'а кросс-доменная. С Angular-remote эту проблему уже проходили,
+повторять не хочется. Проба `/healthz` отвечает константой, не завися от файлов
+приложения.
+
+**Проверено не только «файл отдаётся», а что remote работает как федеративный модуль:**
+в headless-браузере загружен `remoteEntry.js`, `window.mfe_credits.init({})` выполнен,
+`container.get('./CreditsApp')` вернул фабрику, её вызов дал модуль с `CreditsApp`
+(функцией). При этом реально загрузились чанки `main.js`, `659.js`, `610.js` и другие -
+по префиксу `/mfe/credits/`, все 200. Ошибок в консоли нет.
+
+**Побочно:** сборка этого приложения кладётся в `apps/mfe-credits/dist` (цель запускает
+`rspack build` с `cwd=apps/mfe-credits`), а не в корневой `dist/apps/...` - это учтено
+в Dockerfile.
+
 ### BFF в кластере (готово)
 
 Образ собран и опубликован так же, как core-api (`infra/docker/bff.Dockerfile`,

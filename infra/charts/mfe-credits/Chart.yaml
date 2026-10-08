@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mfe-credits
+description: React-remote «Кредиты» (статика под nginx)
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
