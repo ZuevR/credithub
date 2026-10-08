@@ -1,0 +1,25 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shell
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: shell
+    app.kubernetes.io/part-of: credithub
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    # Корень. Более специфичные пути (/api, /mfe/credits, /mfe/calculator)
+    # описаны в чартах соответствующих сервисов; Traefik выбирает самый длинный
+    # совпадающий префикс, поэтому порядок описания роли не играет.
+    - http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: shell
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

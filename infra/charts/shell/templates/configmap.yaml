@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shell-mfe-config
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: shell
+    app.kubernetes.io/part-of: credithub
+data:
+  # Тот же формат, что читает приложение: { "providers": { "<alias>": "<url>" } }.
+  # Значения приходят из values.yaml, поэтому адреса remote'ов - часть
+  # конфигурации деплоя, а не сборки.
+  mfe-config.json: |
+    {
+      "providers": {
+    {{- range $index, $provider := .Values.providers }}
+        {{- if $index }},{{ end }}
+        {{ $provider.alias | quote }}: {{ $provider.url | quote }}
+    {{- end }}
+      }
+    }

@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: shell
+    app.kubernetes.io/part-of: credithub
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shell
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shell
+        app.kubernetes.io/part-of: credithub
+      annotations:
+        # Перезапуск пода при изменении конфига: файл монтируется через subPath,
+        # а такие монтирования НЕ обновляются при правке ConfigMap. Без этой
+        # аннотации смена адресов remote'ов не применилась бы до ручного
+        # перезапуска, и выглядело бы как «конфиг не работает».
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      # Kubernetes иначе создаёт docker-link переменные для сервисов namespace;
+      # нашему коду они не нужны, а конфликт имён уже приводил к падению BFF.
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: shell
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - name: mfe-config
+              mountPath: /usr/share/nginx/html/mfe-config.json
+              subPath: mfe-config.json
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: mfe-config
+          configMap:
+            name: shell-mfe-config

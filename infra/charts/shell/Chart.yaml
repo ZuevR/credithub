@@ -1,0 +1,6 @@
+apiVersion: v2
+name: shell
+description: Shell CreditHub - React SPA с рантайм-реестром remote'ов
+type: application
+version: 0.1.0
+appVersion: "0.0.1"

@@ -1,0 +1,39 @@
+image:
+  repository: ghcr.io/zuevr/credithub-shell
+  tag: dev
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: ghcr-pull
+
+replicaCount: 1
+
+service:
+  port: 80
+
+# Реестр провайдеров, который shell читает на старте (см. apps/shell/src/mf.tsx).
+# Отдаётся ConfigMap'ом и монтируется поверх файла из сборки, поэтому адреса
+# меняются без пересборки образа.
+#
+# Пути ОТНОСИТЕЛЬНЫЕ: тогда конфиг не зависит от того, по какому адресу открыт
+# shell (IP, имя хоста, NodePort) - браузер разрешает их от своего origin.
+# Список, а не словарь: так JSON собирается без хрупкой логики с запятыми.
+providers:
+  - alias: mfe-credits
+    url: /mfe/credits/remoteEntry.js
+  - alias: mfe-calculator
+    url: /mfe/calculator/remoteEntry.mjs
+
+ingress:
+  enabled: true
+  className: traefik
+  # Корень: остальные маршруты (/api, /mfe/*) заданы в своих чартах, и Traefik
+  # выбирает более длинный совпадающий префикс.
+  path: /
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 192Mi
