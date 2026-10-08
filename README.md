@@ -101,7 +101,7 @@
 | `libs/ui` | React + MUI | — | Общие компоненты (`PageHeader`, `WidgetShell`), тема, настройки запросов |
 | `libs/design-tokens` | TypeScript | — | Цвета, отступы, типографика и генерация CSS-переменных |
 | `libs/shared-types` | TypeScript | — | Контракты API (`CreditDto`, `ProgramDto`), деньги, общий расчёт аннуитета |
-| `tools/dev-ingress.mjs` | Node + Express | 8080 | Локальный ingress: маршрутизация как в проде |
+| `tools` | Node + Express | 8080 | Локальный ingress: маршрутизация как в проде |
 
 **Про деньги.** Все суммы передаются в минорных единицах (копейках) целым числом
 — так же, как хранятся в базе. Дробные рубли в `float` дают ошибки округления при
@@ -163,28 +163,27 @@ Seed идемпотентен: повторный запуск ничего не
 
 ### 5. Приложения
 
-Фронт и бэкенд запускаются **в двух терминалах**:
+**Вариант «одной командой»** — поднимает всё сразу: shell, оба remote'а, BFF,
+core-api, SSR-сервис и ingress.
 
 ```sh
-# терминал 1: shell, mfe-credits, mfe-calculator
-yarn dev:front
-
-# терминал 2: BFF и core-api
-yarn dev:back
+yarn dev:all
 ```
 
-Публичный SSR-раздел запускается отдельно (третьим терминалом), потому что у него
-свой сервер:
+Останавливается одним `Ctrl+C`: сигнал гасит и сервисы, и ingress, лишних
+процессов не остаётся.
+
+**Вариант «по частям»** — удобнее, когда нужно перезапускать что-то одно:
 
 ```sh
-yarn dev:ssr          # сборка клиента и сервера + Express на :8106
+yarn dev:front     # shell (:8100), mfe-credits (:8101), mfe-calculator (:8104)
+yarn dev:back      # BFF (:3000), core-api (:3001)
+yarn dev:ssr       # SSR-раздел: сборка + Express (:8106)
+yarn dev:ingress   # ingress (:8080)
 ```
 
-### 6. Ingress
-
-```sh
-yarn dev:ingress      # :8080
-```
+Публичный SSR-раздел собирается дольше остальных: перед запуском Express
+Rsbuild делает клиентскую и серверную сборки.
 
 **Открывайте приложение через ingress: <http://localhost:8080>.** Прямые порты
 тоже работают (например, <http://localhost:8100> для shell), но именно ingress
@@ -240,9 +239,10 @@ yarn nx graph     # граф зависимостей проектов
 Запуск отдельного проекта:
 
 ```sh
+yarn dev:all                      # всё сразу + ingress, Ctrl+C останавливает
 yarn nx run mfe-programs:dev      # dev-сервер Rsbuild (:8105), отладка CSR-версии
-yarn nx run core-api:serve        # core-api с пересборкой
-yarn nx serve <project>           # любой проект
+yarn nx run <project>:serve       # любой проект
+yarn nx <target> <project>        # произвольная цель
 ```
 
 ### Полная таблица портов
@@ -258,6 +258,9 @@ yarn nx serve <project>           # любой проект
 | 3000 | BFF | `yarn dev:back` |
 | 3001 | core-api | `yarn dev:back` |
 | 5433 | PostgreSQL | `docker compose up -d` |
+
+Все семь сервисов, кроме опционального `:8105`, поднимаются одной командой
+`yarn dev:all`.
 
 ### Быстрая проверка, что всё живо
 

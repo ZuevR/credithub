@@ -1,0 +1,16 @@
+{
+  "name": "tools",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "ingress": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "command": "node tools/dev-ingress.mjs",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

@@ -12,7 +12,8 @@
     "dev:back": "nx run-many -t serve -p bff core-api --parallel=2",
     "build:all": "nx run-many -t build -p shell mfe-credits mfe-calculator mfe-programs bff core-api",
     "lint:all": "nx run-many -t lint -p shell mfe-credits mfe-calculator mfe-programs bff core-api ui",
-    "test:all": "nx run-many -t test -p shell mfe-credits bff core-api ui"
+    "test:all": "nx run-many -t test -p shell mfe-credits bff core-api ui",
+    "dev:all": "sh -c 'nx run-many -t serve ingress -p shell mfe-credits mfe-calculator bff core-api tools --parallel=7 & p1=$!; nx run mfe-programs:serve-ssr & p2=$!; trap \"kill $p1 $p2 2>/dev/null\" INT TERM; wait'"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "22.2.1",
