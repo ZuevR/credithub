@@ -298,6 +298,33 @@ bash infra/setup-k3s.sh
 Проверка после установки: `curl http://<IP-машины>/` отвечает **404 от Traefik** —
 это нормально, значит ingress слушает, но маршрутов ещё нет.
 
+### Доступ к кластеру с рабочей машины
+
+На самой машине kubeconfig лежит в `~/.kube/config` (создаётся скриптом
+`infra/setup-k3s.sh`, с адресом API по IP, а не по `127.0.0.1`). Чтобы работать с
+кластером со своей машины, скопируйте его и укажите путь:
+
+```sh
+scp <user>@<host>:~/.kube/config ~/.kube/credithub.yaml
+chmod 600 ~/.kube/credithub.yaml
+export KUBECONFIG=$HOME/.kube/credithub.yaml
+```
+
+**Это cluster-admin доступ** — файл содержит клиентский сертификат администратора,
+поэтому он не должен попадать ни в git, ни в чужие руки.
+
+Helm должен быть **той же мажорной версии, что в кластере** (там сейчас 3.22.0):
+разные мажоры управляют одними релизами по-разному. Для установки ровно 3.x:
+
+```sh
+brew install helm@3          # формула keg-only
+ln -sf /opt/homebrew/opt/helm@3/bin/helm /opt/homebrew/bin/helm
+helm version --short         # v3.22.0
+```
+
+С этим kubeconfig работают и GUI-клиенты (Lens, Freelens, Headlamp, k9s): им нужен
+тот же файл.
+
 ### Сборка образов
 
 Образы описываются в `infra/docker/`, контекст сборки — **корень репозитория**
