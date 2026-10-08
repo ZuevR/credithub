@@ -298,6 +298,43 @@ bash infra/setup-k3s.sh
 Проверка после установки: `curl http://<IP-машины>/` отвечает **404 от Traefik** —
 это нормально, значит ingress слушает, но маршрутов ещё нет.
 
+### Сервисы в кластере
+
+Сервисы разворачиваются чартами из `infra/charts/`. Namespace — **отдельный чарт**:
+это ресурс кластерного уровня, и если бы им владел чарт сервиса, то удаление сервиса
+сносило бы namespace вместе со всем остальным.
+
+```sh
+# один раз: namespace под управление Helm
+helm upgrade --install namespace infra/charts/namespace --namespace credithub
+
+# секрет с паролем (в git не хранится)
+kubectl -n credithub create secret generic postgres-credentials \
+  --from-literal=POSTGRES_USER=credithub \
+  --from-literal=POSTGRES_DB=credithub \
+  --from-literal=POSTGRES_PASSWORD="$(openssl rand -base64 24)" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# база
+helm upgrade --install postgres infra/charts/postgres --namespace credithub --wait
+```
+
+База доступна внутри кластера как `postgres.credithub.svc.cluster.local:5432` и **не
+выставлена наружу**. Для миграций и отладки — port-forward:
+
+```sh
+kubectl -n credithub port-forward svc/postgres 5433:5432
+kubectl -n credithub get secret postgres-credentials \
+  -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d
+```
+
+Проверка состояния:
+
+```sh
+kubectl -n credithub get pods,pvc,svc
+kubectl -n credithub exec postgres-0 -- psql -U credithub -d credithub -c '\l'
+```
+
 **Грабли, найденные при настройке:**
 
 - `kubectl` в k3s — симлинк на сам `k3s`, и он читает

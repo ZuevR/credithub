@@ -1,0 +1,43 @@
+# Значения чарта PostgreSQL.
+#
+# Пароль здесь НЕ хранится: он передаётся при установке (`--set auth.password=...`),
+# иначе секрет уехал бы в git вместе с чартом. Сгенерировать можно так:
+#   openssl rand -base64 24
+
+# namespace создаётся чартом: в одном кластере на этой машине живут и другие
+# вещи, и всё наше должно быть отделено.
+namespace: credithub
+
+image:
+  repository: postgres
+  # Та же версия, что в локальном docker-compose - чтобы поведение в кластере
+  # и на машине разработчика совпадало.
+  tag: "17.5-alpine"
+  pullPolicy: IfNotPresent
+
+auth:
+  username: credithub
+  database: credithub
+  # Имя уже существующего Secret с ключами POSTGRES_USER/POSTGRES_DB/POSTGRES_PASSWORD.
+  # Рекомендуемый способ: создать Secret заранее через kubectl, тогда пароль не
+  # попадает ни в git, ни в историю команд (`helm --set` её оставляет).
+  existingSecret: postgres-credentials
+  # Запасной путь: если Secret не создан заранее, пароль можно передать здесь.
+  # Пустое значение при отсутствии existingSecret приведёт к ошибке рендеринга -
+  # это намеренно, чтобы нельзя было поднять базу с пустым паролем.
+  password: ""
+
+persistence:
+  # local-path привязывает том к конкретной ноде. У нас нода одна, поэтому это
+  # не ограничение; в многонодовом кластере так нельзя.
+  storageClass: local-path
+  size: 10Gi
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    # Postgres любит память под кэш, но 31 ГБ на машине хватает с запасом:
+    # ограничение защищает остальные сервисы от одного разросшегося процесса.
+    memory: 1Gi

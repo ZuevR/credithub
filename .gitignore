@@ -2,6 +2,7 @@
 
 # локальное окружение (в репозиторий попадает только .env.example)
 .env
+infra/.env.infra
 .env.local
 
 # compiled output

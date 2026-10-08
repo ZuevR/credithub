@@ -1,0 +1,19 @@
+# Headless-сервис (clusterIP: None) - для StatefulSet это стандарт: он даёт
+# каждому поду стабильное DNS-имя и не балансирует трафик, который всё равно
+# идёт на конкретную реплику.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: credithub
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
