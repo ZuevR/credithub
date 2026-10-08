@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: credithub
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak
+        app.kubernetes.io/part-of: credithub
+    spec:
+      # Kubernetes иначе создаёт для сервисов namespace переменные в стиле
+      # docker-links (`<ИМЯ>_PORT` и прочие). Они legacy и уже приводили к
+      # конфликту имён (см. историю с BFF_PORT).
+      enableServiceLinks: false
+      containers:
+        - name: keycloak
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # start-dev: лабораторный режим со встроенной БД. Для прода нужен
+          # `start` с внешней базой - отдельный шаг.
+          args: ["start-dev"]
+          env:
+            - name: KC_HTTP_RELATIVE_PATH
+              value: {{ .Values.http.relativePath | quote }}
+            - name: KC_HOSTNAME
+              value: {{ .Values.http.hostname | quote }}
+            # Keycloak за Traefik должен доверять заголовкам X-Forwarded-*,
+            # иначе он считает, что клиент пришёл по http на внутренний адрес.
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.admin.existingSecret }}
+                  key: {{ .Values.admin.usernameKey }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.admin.existingSecret }}
+                  key: {{ .Values.admin.passwordKey }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+            # Management-порт: с Keycloak 25 health/metrics переехали сюда.
+            # Первая версия чарта стучалась в /auth/health/* на основном порту,
+            # получала 404, и liveness убивал контейнер по кругу (CrashLoopBackOff).
+            - name: management
+              containerPort: {{ .Values.service.managementPort }}
+          # Пробы смотрят на health-эндпоинты, а не на открытый порт: порт
+          # открывается раньше, чем Keycloak готов обслуживать запросы.
+          readinessProbe:
+            httpGet:
+              # Префикс /auth применяется и к management-порту: проверено на живом
+              # Keycloak - http://<pod>:9000/auth/health/ready отдаёт 200, а
+              # http://<pod>:9000/health/ready - 404.
+              path: {{ .Values.http.relativePath }}/health/ready
+              port: management
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            # Первый старт может быть долгим (схема встроенной БД), даём запас.
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.http.relativePath }}/health/live
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

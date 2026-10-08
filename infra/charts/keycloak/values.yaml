@@ -1,0 +1,56 @@
+# Keycloak как OIDC-провайдер стенда.
+#
+# Режим `start-dev` (встроенная БД H2): для стенда этого достаточно, потому что
+# состояние воспроизводится импортом realm из Git, а не живёт в базе. В прод так
+# нельзя - там нужен `start` с внешней БД и кластеризацией; это отдельный шаг.
+
+namespace: credithub
+
+image:
+  repository: quay.io/keycloak/keycloak
+  # Версия закреплена: `latest` на стенде означал бы, что после перезапуска пода
+  # может приехать другая версия, и «что именно задеплоено» неизвестно.
+  tag: "26.8.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+http:
+  # Keycloak стоит за Traefik, а Traefik префикс пути НЕ срезает (проверено на
+  # офисном стенде). Поэтому Keycloak служит под /auth сам, и путь в Ingress
+  # совпадает с тем, что видит приложение.
+  relativePath: /auth
+  # Внешний адрес: от него зависят issuer в токенах и все редиректы. Если не
+  # задать, Keycloak отдавал бы http://localhost:8080 - браузер ушёл бы не туда,
+  # а BFF не сошёлся бы по issuer.
+  hostname: http://192.168.0.29/auth
+
+# Пароль администратора здесь НЕ хранится: Secret создаётся заранее через
+# kubectl (как postgres-credentials), чтобы пароль не попал ни в git, ни в
+# историю команд.
+admin:
+  existingSecret: keycloak-admin
+  # Имена ключей в Secret - сразу в том виде, в каком их ждёт Keycloak 26.
+  usernameKey: KC_BOOTSTRAP_ADMIN_USERNAME
+  passwordKey: KC_BOOTSTRAP_ADMIN_PASSWORD
+
+service:
+  port: 8080
+  # Management-порт Keycloak: с версии 25 health- и metrics-эндпоинты живут
+  # именно на нём, а не на основном порту. Наружу его не выставляем - пробы
+  # ходят в под напрямую.
+  managementPort: 9000
+
+ingress:
+  enabled: true
+  className: traefik
+  path: /auth
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    # Keycloak на старте активно ест память; ограничение защищает остальные
+    # сервисы от одного разросшегося процесса.
+    memory: 1Gi

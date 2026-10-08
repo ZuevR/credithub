@@ -87,7 +87,13 @@ primary color AppBar и кнопок совпадает в shell и mfe, standal
 
 ## Шаг 5 — Auth (Keycloak)
 
-- [ ] Keycloak в docker-compose, realm credithub
+**Отклонение от первоначальной формулировки (решено 2026-10-08).** Keycloak разворачивается
+**в кластере** — своим чартом `infra/charts/keycloak`, с Ingress `/auth` через Traefik, — а не
+в `docker-compose`. Причины: в `PROJECT.md` Keycloak и так стоит за Traefik (`/auth/*`), а
+критерии приёмки проверяются на стенде; compose остался бы окружением только для локальной
+разработки и был бы недоступен ни снаружи, ни (позже) ArgoCD.
+
+- [ ] Keycloak **в кластере** (чарт `infra/charts/keycloak`, Ingress `/auth`), realm `credithub`
 - [ ] Клиенты: shell (public, PKCE), bff (confidential)
 - [ ] BFF проверяет JWT
 - [ ] Токен из shell прокидывается в MFE через shared context

@@ -1,0 +1,25 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: credithub
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    # Без `host`: обращаемся по IP хоста, DNS-имени у стенда нет.
+    - http:
+        paths:
+          # Путь совпадает с KC_HTTP_RELATIVE_PATH: Traefik префикс не срезает,
+          # поэтому Keycloak должен сам обслуживать /auth.
+          - path: {{ .Values.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

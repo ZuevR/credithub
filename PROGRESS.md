@@ -1,13 +1,64 @@
 # Текущий прогресс
 
-**Обновлено:** 2026-10-08
-**Текущий шаг:** шаги 1–4 закрыты; инфраструктура развёрнута на домашнем ПК.
-**Статус:** вся схема из PROJECT.md работает в k3s. Деплой пока ручной (helm), ArgoCD не подключён.
+**Обновлено:** 2026-10-08 — **остановились на этом месте**
+**Текущий шаг:** **Шаг 5 (Auth/Keycloak)**: подшаг **5a закрыт**, следующий — **5b** (realm `credithub` как код).
+**Статус:** вся схема из PROJECT.md работает в k3s на двух стендах; на домашнем стенде добавлен Keycloak и отвечает по `/auth`. **Домашний стенд остановлен** (k3s `inactive`, автозапуск выключен — `enabled=disabled`). Поднять обратно: `sudo systemctl start k3s` (рецепт с чисткой контейнеров — в разделе «Остановка и запуск» ниже). Деплой пока ручной (helm), ArgoCD не подключён — это Шаг 8.
+
+**Как продолжить с этого места.** Начать с **5b**: файл `infra/charts/keycloak/files/realm-credithub.json`
+(realm, клиенты `shell`/`bff`, роль, пользователь), ConfigMap из него (`templates/realm-configmap.yaml`),
+монтирование в `/opt/keycloak/data/import` и аргумент `--import-realm`. Затем **5c** (BFF проверяет JWT
+по JWKS), **5d** (вход в shell по PKCE и передача токена в MFE), **5e** (критерии приёмки).
+Уже принятые решения, которые не нужно обсуждать заново: Keycloak живёт **в кластере**, а не в
+`docker-compose`; на Шаге 8 CI собирает образы и **коммитит неизменяемый тег `sha` в `values.yaml`**
+с `pullPolicy: IfNotPresent`.
+
+**Не закоммичено (ждёт решения):** `PROGRESS.md`, `PLAN.md`, `HOMEWORK.md`, `.dockerignore` и новый
+чарт `infra/charts/keycloak/`.
+
+**Остановка и запуск домашнего стенда (проверено 2026-10-08).** k3s остановлен и снят с
+автозапуска. **Важно:** одного `systemctl stop k3s` недостаточно — в юните k3s стоит
+`KillMode=process`, то есть systemd убивает только главный процесс, а потомков (containerd и
+контейнеры подов) должен погасить сам k3s, и он не всегда дочищает: после первой остановки
+остались 13 процессов `containerd-shim` и живые `postgres`/`traefik`/`nginx`. Для этого в
+комплекте есть `k3s-killall.sh`.
+
+```sh
+# остановить и снять с автозапуска
+sudo systemctl stop k3s && sudo systemctl disable k3s
+sudo k3s-killall.sh                              # добивает контейнеры и правила iptables/ip6tables
+ps -C containerd-shim --no-headers | wc -l       # ожидаем 0
+ss -Htln | grep -E ':(80|443|6443)' || echo 'порты свободны'
+
+# вернуть обратно
+sudo systemctl enable --now k3s
+```
+
+Что сохраняется: данные PostgreSQL — `/var/lib/rancher/k3s/storage/pvc-…_credithub_data-postgres-0`
+(47 МБ), образы — `/var/lib/rancher/k3s/agent` (3,6 ГБ), всё состояние кластера (k3s хранит его
+сам). Что теряется: состояние Keycloak в `start-dev` (H2 внутри пода) — но наш realm ещё не
+импортирован, терять нечего.
+
+**Осторожно при возврате:** пять сервисов объявлены с `pullPolicy: Always`, поэтому после старта
+они пойдут в GHCR. Если токен к тому моменту отозван, а секрет `ghcr-pull` не обновлён, поды
+не скачают образы — сначала обновить секрет (команда в разделе про безопасность ниже).
+
+Docker при этом не трогаем: кластеру он не нужен, он только для сборки образов (можно остановить
+отдельно: `sudo systemctl stop docker docker.socket containerd`).
+
+Проверено повторно 2026-10-09 (остановка перед паузой): `k3s inactive / enabled=disabled`,
+`containerd-shim` — 0, процессов подов — 0, порты 80/443/6443 свободны, данные PostgreSQL (47 МБ)
+и образы (3,8 ГБ) на месте.
 
 ## Точка остановки: где мы и что дальше
 
-**Стенд доступен по адресу <http://192.168.1.187/>** — shell, оба remote'а, SSR-раздел
-и API. Все 7 подов `Running`, 8 релизов Helm.
+**Стендов теперь два — их важно не путать:**
+
+| Стенд | Адрес | Состояние |
+|---|---|---|
+| офисный | <http://192.168.1.187/> | собран ранее: shell, оба remote'а, SSR и API; 7 подов `Running`, 8 релизов Helm |
+| **домашний (рабочий)** | <http://192.168.0.29/> | собран по [HOMEWORK.md](HOMEWORK.md), Этапы 0–8 пройдены: k3s `v1.36.5+k3s1`, Traefik `41.6.1` чартом, PostgreSQL `17.5`, шесть сервисов из GHCR; снаружи открываются `/`, `/credits`, `/calculator`, `/programs`, `/api/*` |
+
+Дальше все работы ведутся на **домашнем** стенде.
 
 **Что развёрнуто в кластере (k3s на `192.168.1.187`):**
 
@@ -22,13 +73,30 @@
 | mfe-programs | SSR-раздел (Node + Express) | `/programs`, `/mfe/programs` |
 | Traefik | ingress | 80/443 |
 
-**Три возможных следующих шага (на выбор, ничего не начато):**
-1. **ArgoCD (GitOps)** — заявлен в PROJECT.md; сейчас деплой ручной через `helm upgrade`.
-   Чарты готовы, нужен только ArgoCD и репозиторий как источник истины.
-2. **Keycloak/OIDC (шаг 5 плана)** — закроет ограничение: владелец портфеля сейчас
-   определяется константой `DEMO_CLIENT_ID` в core-api.
-3. **Скрипт деплоя** — сборка, тег, пуш и `helm upgrade` сейчас выполняются вручную по
-   шагам (описаны в README); можно оформить одной командой.
+**Текущий шаг — Шаг 5 (Auth/Keycloak) на домашнем стенде:**
+- [x] **5a.** Keycloak в кластере: свой чарт `infra/charts/keycloak`, Ingress `/auth` через
+  Traefik, `KC_HTTP_RELATIVE_PATH=/auth` (Traefik префикс не срезает), версия закреплена
+  `26.8.0`, режим `start-dev`. Пароль администратора — в Secret `keycloak-admin` (в git нет).
+  Проверено: `issuer` = `http://192.168.0.29/auth/realms/master`, админка отвечает 302,
+  под `1/1 Running`. **Грабля (найдена и исправлена):** с Keycloak 25 health-эндпоинты живут
+  на отдельном **management-порту 9000**, причём префикс `/auth` применяется и к нему:
+  `:9000/auth/health/ready` → 200, а `:9000/health/ready` → 404. Первая версия чарта стучалась
+  в `/auth/health/*` на 8080, получала 404 и уходила в `CrashLoopBackOff`. Management-порт
+  наружу не выставлен — пробы ходят в под напрямую. Ещё: `KC_HOSTNAME_STRICT` в 26-й версии
+  игнорируется, если задан `KC_HOSTNAME` (сообщает сам Keycloak в логе) — убрал как мёртвую
+  настройку;
+- [ ] **5b.** Realm `credithub` как код: ConfigMap + `--import-realm`, клиенты `shell`
+  (public + PKCE) и `bff` (confidential), роли и тестовые пользователи;
+- [ ] **5c.** BFF проверяет JWT по JWKS Keycloak;
+- [ ] **5d.** shell: вход по OIDC (PKCE), передача токена в MFE через общий контекст,
+  logout и refresh;
+- [ ] **5e.** Проверка критериев приёмки: без токена — редирект, с токеном — доступ,
+  MFE получает токен без перезагрузки.
+
+**Порядок работ (решение 2026-10-08).** Пользователь выбрал строгий порядок `PLAN.md`: сначала
+Шаг 5 (Keycloak), затем Шаг 8 (CI/CD + ArgoCD). Для Шага 8 уже принято решение по связке
+«сборка ↔ деплой»: CI собирает образы и **коммитит неизменяемый тег `sha` в
+`infra/charts/*/values.yaml`**, `pullPolicy: IfNotPresent` — вместо изменяемого `dev` + `Always`.
 
 **Открытые технические долги (осознанные, не забытые):**
 - образы помечены изменяемым тегом `dev` с `pullPolicy: Always`; в проде нужен
@@ -45,13 +113,43 @@
   `yarn nx run core-api:migration:run` и `yarn nx run core-api:seed` (если база пустая),
   затем `yarn dev:all` — поднимает всё и ingress, останавливается одним `Ctrl+C`;
   открывать `http://localhost:8080/`;
-- kubeconfig для стенда: `~/.kube/credithub.yaml` (вне репозитория, cluster-admin);
+- kubeconfig офисного стенда: `~/.kube/credithub.yaml` (вне репозитория, cluster-admin);
+- kubeconfig домашнего стенда: `/home/roman/.kube/config` **на самой машине**, адрес API
+  `https://192.168.0.29:6443`; с рабочей машины к нему ходим по SSH (ключ, без пароля);
 - копия репозитория на машине: `~/credithub` — из неё собираются образы.
 
 **Безопасность — требует действия:** PAT GitHub, которым публиковались образы, был
 передан открытым текстом и имеет лишнее право `repo`; **его нужно отозвать** и выпустить
 новый только с `write:packages`. Локально он лежит в `infra/.ghcr-token` (в `.gitignore`) —
 файл удалить после отзыва.
+
+**Безопасность домашнего стенда (2026-10-08).** Патч-токен GHCR и пароль `sudo` были переданы
+в переписке открытым текстом, то есть считаются раскрытыми: токен отозвать, пароль сменить.
+После отзыва токена **обязательно** пересоздать pull-секрет в кластере, иначе поды с
+`pullPolicy: Always` не скачают образы:
+
+```sh
+kubectl -n credithub delete secret ghcr-pull && kubectl -n credithub create secret generic ghcr-pull --from-file=.dockerconfigjson=$HOME/.docker/config.json --type=kubernetes.io/dockerconfigjson
+```
+
+Файл токена на домашнем стенде лежит **вне репозитория** (`~/.ghcr-token`): так он физически не
+может попасть в контекст сборки (`.dockerignore` дополнительно исключает `infra/.ghcr-token`).
+
+**Токен GHCR заменён (2026-10-08, выполнено).** Новый PAT сохранён на машине в `~/.ghcr-token`
+(права `600`, вне репозитория), `docker login ghcr.io -u ZuevR` → `Login Succeeded`, секрет
+`ghcr-pull` пересоздан из `~/.docker/config.json` (`--from-file=.dockerconfigjson`, токен не
+попадает в аргументы команды). Проверено фактом: перезапуск `shell` дал события
+`Pulling image "ghcr.io/zuevr/credithub-shell:dev"` → `Successfully pulled image … in 993ms`,
+под `1/1 Running`; все восемь подов вернулись в `Running`.
+
+**Что осталось сделать вручную:** отозвать старый токен (<https://github.com/settings/tokens>) и
+удалить его локальную копию на рабочей машине (`rm infra/.ghcr-token`).
+
+**Решение по паролю (2026-10-09):** пароль `sudo` **не меняем** и парольный вход по SSH оставляем
+как есть — пользователь принял этот риск осознанно, тема закрыта. Зафиксировано здесь, чтобы не
+поднимать её заново. На всякий случай, для истории: пароля нет в логах целевой машины
+(`~/.bash_history`, `/var/log/auth.log`, `journalctl` — проверено, 0 совпадений), `PermitRootLogin`
+= `prohibit-password`, `sudo` требует пароль.
 
 
 ## Шаг 4 — BFF + Core API + PostgreSQL (ЗАКРЫТ)
@@ -653,6 +751,8 @@ DATABASE_URL="postgres://credithub:<пароль>@127.0.0.1:15433/credithub" yar
 | Nx Daemon `FOREIGN KEY constraint failed` | `yarn nx reset`; если повторяется — `"useDaemonProcess": false` в nx.json |
 | `MODULE_TYPELESS_PACKAGE_JSON` warning | Добавить `"type": "module"` в package.json приложения |
 | `favicon.ico 404` | Положить favicon в public/ (косметика, шаг 1) |
+| Health-эндпоинты Keycloak отдают 404 | С Keycloak 25 они на отдельном management-порту **9000**, и `KC_HTTP_RELATIVE_PATH` применяется к нему тоже: `:9000/auth/health/ready` → 200, `:9000/health/ready` → 404. Пробы должны смотреть на 9000 **с полным путём**, иначе liveness убивает контейнер и получается `CrashLoopBackOff` |
+| `KC_HOSTNAME_STRICT` в Keycloak 26 не действует | Если задан `KC_HOSTNAME`, Keycloak пишет в лог «hostname-strict is effectively ignored» — настройка мёртвая, убрать |
 
 ## Открытые вопросы
 
