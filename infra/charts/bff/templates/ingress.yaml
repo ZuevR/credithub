@@ -1,0 +1,24 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bff
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: bff
+    app.kubernetes.io/part-of: credithub
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    # Без `host`: DNS-имени у нас нет, обращаемся по IP хоста. Traefik будет
+    # обслуживать этот путь для любого Host.
+    - http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: bff
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

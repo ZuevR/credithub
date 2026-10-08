@@ -266,6 +266,45 @@ Dockerfile, чтобы не повторять попытку.
   базой, что развёрнута в кластере;
 - в образе только `dist`, `node_modules` и `package.json`.
 
+### BFF в кластере (готово)
+
+Образ собран и опубликован так же, как core-api (`infra/docker/bff.Dockerfile`,
+`ghcr.io/zuevr/credithub-bff`), чарт — `infra/charts/bff`: Deployment, ClusterIP Service
+и **Ingress** (`/api` → BFF, без `host`, поэтому работает обращение по IP).
+
+`CORE_API_URL` внутри кластера — `http://core-api.credithub.svc.cluster.local:3001/api`,
+то есть BFF ходит в доменный сервис **по DNS-имени сервиса**. Это и была проверка того,
+что граница сервисов работает в кластере, а не только на локальной машине.
+
+**Главная находка: конфликт имени переменной окружения с Kubernetes.**
+Под BFF падал в `CrashLoopBackOff` с `ERR_SOCKET_BAD_PORT: ... Received type number (NaN)`.
+Приложение читало порт из `BFF_PORT`, а Kubernetes **сам создаёт env-переменные для
+каждого Service в namespace** в стиле docker-links. Для сервиса с именем `bff`
+появляется `BFF_PORT=tcp://10.43.226.249:3000` (проверено: `kubectl run ... env`), и
+`Number('tcp://...')` даёт `NaN`. Симптом при этом указывает куда угодно, кроме причины:
+падение в `app.listen`, а не в чтении конфигурации.
+
+Исправлено тремя независимыми мерами:
+1. переменная переименована в **`BFF_HTTP_PORT`** — имя больше не может совпасть с
+   `<ИМЯ_СЕРВИСА>_PORT` (обновлены `.env`, `.env.example`, код);
+2. значение **проверяется** в `resolvePort()`: нечисловой порт даёт понятную ошибку с
+   именем переменной и её значением, а не `NaN` в недрах `listen`;
+3. в деплойментах BFF и core-api выставлен **`enableServiceLinks: false`** — эти
+   docker-link переменные legacy, нашему коду не нужны вовсе.
+
+**Вторая находка: изменяемый тег и кэш образа.** Тег был `dev`, а `pullPolicy:
+IfNotPresent` — при обновлении чарта нода брала прежний образ из кэша, и новый код не
+применялся. Для тега `dev` поставлен `pullPolicy: Always`; в проде тег должен быть
+неизменяемым (например, git-sha), и тогда `IfNotPresent` уместен.
+
+**Побочно:** прерванный `helm upgrade` оставил релиз в статусе `pending-install`, и
+повторный upgrade падал с `another operation is in progress`. Лечится `helm uninstall`
+и установкой заново.
+
+**Проверено с рабочей машины через Traefik:** `/api/health`, `/api/credits`,
+`/api/programs`, `/api/dashboard` — все 200; данные из кластерной базы доезжают до
+клиента с корректными суммами и датами.
+
 ### Доступ к кластеру с рабочей машины (готово)
 
 kubeconfig скопирован с машины в `~/.kube/credithub.yaml` (права `600`, **вне

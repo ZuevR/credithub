@@ -1,0 +1,37 @@
+image:
+  repository: ghcr.io/zuevr/credithub-bff
+  tag: dev
+  # Always, потому что тег `dev` изменяемый: при IfNotPresent нода берёт образ из
+  # кэша и обновление чарта не приводит к новому коду. В проде тег должен быть
+  # неизменяемым (например, git-sha), и тогда уместен IfNotPresent.
+  pullPolicy: Always
+
+# Список объектов `{name: ...}` - именно так, а не строки: Helm пропускает строки
+# молча, а API-сервер отвергает манифест.
+imagePullSecrets:
+  - name: ghcr-pull
+
+replicaCount: 1
+
+coreApi:
+  # Адрес доменного сервиса ВНУТРИ кластера - по DNS-имени сервиса, а не localhost.
+  # Это и есть проверка того, что граница BFF↔core-api работает в кластере.
+  # Путь включает префикс /api: у core-api все маршруты под ним.
+  url: http://core-api.credithub.svc.cluster.local:3001/api
+
+service:
+  port: 3000
+
+# BFF - единственная точка API для фронта, поэтому он выставляется через Ingress.
+# Правило без host: обращение по IP хоста (DNS-имени у нас нет).
+ingress:
+  enabled: true
+  className: traefik
+  path: /api
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 384Mi
