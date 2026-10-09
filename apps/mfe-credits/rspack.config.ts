@@ -57,6 +57,13 @@ const SHARED = Object.fromEntries(
   ])
 );
 
+// libs/auth-context - общий singleton с shell'ом: контекст React работает,
+// только если это ОДИН объект, иначе remote увидит свою копию и токена не
+// получит. Версии у workspace-библиотеки нет, поэтому requiredVersion: false.
+const SHARED_WORKSPACE = {
+  '@credithub/auth-context': { singleton: true, requiredVersion: false },
+};
+
 // Read mode from the rspack CLI arg (`--mode=development|production`) so the
 // config works the same on Windows + POSIX without depending on a shell
 // `NODE_ENV=...` prefix.
@@ -94,6 +101,10 @@ export default defineConfig((_env, argv) => {
       // `paths` in tsconfig.base.json and the shell's config. libs/ui itself
       // imports @credithub/design-tokens, so both aliases are required.
       alias: {
+        '@credithub/auth-context': path.resolve(
+          __dirname,
+          '../../libs/auth-context/src/index.ts'
+        ),
         '@credithub/design-tokens': path.resolve(
           __dirname,
           '../../libs/design-tokens/src/index.ts'
@@ -137,7 +148,7 @@ export default defineConfig((_env, argv) => {
         exposes: {
           './CreditsApp': './src/credits-app.tsx',
         },
-        shared: SHARED,
+        shared: { ...SHARED, ...SHARED_WORKSPACE },
       }),
     ].filter(Boolean),
   };

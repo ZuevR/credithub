@@ -3,6 +3,7 @@ import { Alert, Box, Button, Skeleton, Stack, Typography } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
 import { createAppTheme, PageHeader, WidgetShell } from '@credithub/ui';
+import { useOptionalAuth } from '@credithub/auth-context';
 import type { CreditDto, CurrencyCode, Money } from '@credithub/shared-types';
 
 /**
@@ -12,8 +13,19 @@ import type { CreditDto, CurrencyCode, Money } from '@credithub/shared-types';
  */
 const CREDITS_ENDPOINT = '/api/credits';
 
-async function fetchCredits(): Promise<CreditDto[]> {
-  const response = await fetch(CREDITS_ENDPOINT);
+/** Токена нет или он истёк: BFF отвечает 401. Отделяю от прочих ошибок. */
+class UnauthorizedError extends Error {}
+
+async function fetchCredits(token: string | null): Promise<CreditDto[]> {
+  const response = await fetch(CREDITS_ENDPOINT, {
+    // Токен приходит из общего контекста авторизации (libs/auth-context):
+    // библиотека объявлена общим singleton'ом федерации, поэтому remote видит
+    // тот же токен, что и shell.
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (response.status === 401) {
+    throw new UnauthorizedError('Сессия истекла — войдите заново');
+  }
   if (!response.ok) {
     // Сообщение BFF полезнее общего «ошибка запроса»: он различает 404,
     // недоступный core-api (502) и прочие случаи.
@@ -83,17 +95,52 @@ function CreditCard({ credit }: { credit: CreditDto }) {
  */
 export function CreditsApp() {
   const theme = useMemo(() => createAppTheme(), []);
+  // Тот же контекст, что и в shell (библиотека объявлена общим singleton'ом
+  // федерации). null означает standalone-режим, где провайдера нет.
+  const auth = useOptionalAuth();
+  const token = auth?.token ?? null;
   const { data, isPending, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['credits'],
-    queryFn: fetchCredits,
+    // Токен входит в ключ запроса: после входа или выхода данные
+    // перезапрашиваются сами, без перезагрузки страницы.
+    queryKey: ['credits', token ?? 'anonymous'],
+    queryFn: () => fetchCredits(token),
+    // Без токена запрос бессмысленен - BFF ответит 401, поэтому вместо ошибки
+    // показываем состояние «нужен вход».
+    enabled: Boolean(token),
   });
 
   return (
     <ThemeProvider theme={theme}>
       <section data-testid="credits-app">
         <PageHeader title="Кредиты" subtitle="Портфель кредитов клиента" />
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          data-testid="credits-auth"
+        >
+          Контекст авторизации:{' '}
+          {auth ? (auth.username ?? 'не выполнен вход') : 'нет (standalone)'}
+        </Typography>
 
-        {isPending && (
+        {!token && (
+          <Alert
+            severity="info"
+            data-testid="credits-need-login"
+            action={
+              auth ? (
+                <Button color="inherit" size="small" onClick={auth.login}>
+                  Войти
+                </Button>
+              ) : undefined
+            }
+          >
+            {auth
+              ? 'Нужен вход: кредиты доступны только с токеном.'
+              : 'Запущено standalone: вход доступен внутри shell.'}
+          </Alert>
+        )}
+
+        {isPending && token && (
           // Скелетоны вместо спиннера: держат итоговую раскладку и не дают
           // странице «прыгнуть» после загрузки.
           <Box
@@ -120,7 +167,9 @@ export function CreditsApp() {
               </Button>
             }
           >
-            Не удалось загрузить кредиты: {(error as Error).message}
+            {error instanceof UnauthorizedError
+              ? 'Сессия истекла — войдите заново'
+              : `Не удалось загрузить кредиты: ${(error as Error).message}`}
           </Alert>
         )}
 
