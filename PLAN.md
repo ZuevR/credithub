@@ -93,14 +93,21 @@ primary color AppBar и кнопок совпадает в shell и mfe, standal
 критерии приёмки проверяются на стенде; compose остался бы окружением только для локальной
 разработки и был бы недоступен ни снаружи, ни (позже) ArgoCD.
 
-- [ ] Keycloak **в кластере** (чарт `infra/charts/keycloak`, Ingress `/auth`), realm `credithub`
-- [ ] Клиенты: shell (public, PKCE), bff (confidential)
-- [ ] BFF проверяет JWT
-- [ ] Токен из shell прокидывается в MFE через shared context
-- [ ] Logout, refresh, роли
+- [x] Keycloak **в кластере** (чарт `infra/charts/keycloak`, Ingress `/auth`), realm `credithub`
+      как код: ConfigMap + `--import-realm`, внешний адрес стенда подставляется из values.
+      **Стенд переведён на https** — вынужденно: OIDC в браузере требует WebCrypto
+      (`crypto.subtle`), а он есть только в secure context, то есть на http по IP его нет
+- [x] Клиенты: shell (public, PKCE S256), bff (confidential); секрет клиента и пароль тестового
+      пользователя в репозитории не хранятся (Secret + admin API)
+- [x] BFF проверяет JWT по JWKS: `iss` — внешний https, а ключи берутся внутри кластера по http
+      (внешний сертификат самоподписанный, Node его не принял бы)
+- [x] Токен из shell прокидывается в MFE через shared context (`libs/auth-context` объявлена общим
+      singleton'ом федерации в shell и в remote'е)
+- [x] Logout (с реальным закрытием SSO-сессии Keycloak), refresh (тихое продление), роли
 
-Критерии приёмки: без токена — редирект на Keycloak, с токеном — доступ,
-MFE получает токен без перезагрузки.
+Критерии приёмки: без токена — редирект на Keycloak (защищённый маршрут `/credits` уводит сам,
+`/api/*` отвечает 401), с токеном — доступ,
+MFE получает токен без перезагрузки. **Пройдено на офисном стенде 2026-10-09.**
 
 ## Шаг 6 — Dockerize
 
