@@ -1,0 +1,82 @@
+{
+  "realm": "credithub",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationEmailAsUsername": false,
+  "rememberMe": false,
+  "passwordPolicy": "length(8) and notUsername and notEmail and lowerCase(1) and upperCase(1) and digits(1)",
+  "clients": [
+    {
+      "clientId": "shell",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "__BASE_URL__/*",
+        "http://localhost:8100/*"
+      ],
+      "webOrigins": [
+        "__BASE_URL__",
+        "http://localhost:8100"
+      ],
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "__BASE_URL__/*"
+      },
+      "rootUrl": "__BASE_URL__",
+      "baseUrl": "/"
+    },
+    {
+      "clientId": "bff",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "__BASE_URL__/*"
+      ],
+      "webOrigins": [
+        "__BASE_URL__"
+      ],
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "attributes": {
+        "post.logout.redirect.uris": "__BASE_URL__/*"
+      },
+      "rootUrl": "__BASE_URL__",
+      "baseUrl": "/"
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Regular user"
+      },
+      {
+        "name": "admin",
+        "description": "Administrator"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "testuser@credithub.local",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "realmRoles": [
+        "user"
+      ]
+    }
+  ]
+}

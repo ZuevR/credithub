@@ -1,0 +1,16 @@
+{{- if .Values.realm.import }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: realm-credithub
+  namespace: {{ .Values.namespace | default "credithub" }}
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: credithub
+data:
+  # Realm как код: Keycloak импортирует этот файл при старте с --import-realm.
+  # В файле внешний адрес стенда стоит плейсхолдером __BASE_URL__, поэтому один
+  # и тот же realm работает и в офисе, и дома - адрес приходит из values.
+  {{ .Values.realm.file }}: |-
+{{ .Files.Get (printf "files/%s" .Values.realm.file) | replace "__BASE_URL__" .Values.realm.baseUrl | indent 4 }}
+{{- end }}

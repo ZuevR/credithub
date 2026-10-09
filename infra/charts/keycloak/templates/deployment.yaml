@@ -27,7 +27,14 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           # start-dev: лабораторный режим со встроенной БД. Для прода нужен
           # `start` с внешней базой - отдельный шаг.
-          args: ["start-dev"]
+          args:
+            - start-dev
+            # Импорт realm из ConfigMap при старте. В start-dev база живёт
+            # внутри пода, поэтому при пересоздании пода realm импортируется
+            # заново - состояние всегда соответствует файлу в Git.
+            {{- if .Values.realm.import }}
+            - --import-realm
+            {{- end }}
           env:
             - name: KC_HTTP_RELATIVE_PATH
               value: {{ .Values.http.relativePath | quote }}
@@ -78,3 +85,16 @@ spec:
             periodSeconds: 20
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.realm.import }}
+          volumeMounts:
+            # Keycloak читает файлы импорта из /opt/keycloak/data/import.
+            - name: realm-config
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+          {{- end }}
+      {{- if .Values.realm.import }}
+      volumes:
+        - name: realm-config
+          configMap:
+            name: realm-credithub
+      {{- end }}
