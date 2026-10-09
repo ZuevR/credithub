@@ -40,6 +40,13 @@ spec:
               value: {{ .Values.service.port | quote }}
             - name: CORE_API_URL
               value: {{ .Values.coreApi.url | quote }}
+            - name: KC_ISSUER
+              value: {{ .Values.kcIssuer | quote }}
+            {{- with .Values.kcJwksUri }}
+            # Задан отдельный адрес ключей - не выводим его из issuer'а.
+            - name: KC_JWKS_URI
+              value: {{ . | quote }}
+            {{- end }}
           # У BFF проба осмысленнее, чем у core-api: он проверяет только свой
           # процесс и не ходит в core-api. Иначе недоступность доменного сервиса
           # помечала бы BFF нездоровым, и ingress снял бы его с обслуживания.

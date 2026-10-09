@@ -22,6 +22,17 @@ coreApi:
 service:
   port: 3000
 
+# Issuer Keycloak-реалма, из которого BFF принимает JWT. Проверяется в каждом
+# токене (claim `iss`), поэтому при переходе стенда на https здесь тоже https.
+kcIssuer: https://192.168.1.187/auth/realms/credithub
+
+# Отдельный адрес JWKS. Ключи берём ВНУТРИ кластера по http, хотя issuer внешний
+# и https: внешний сертификат самоподписанный, и Node его не примет, а доверие
+# токену всё равно даёт проверка подписи вместе с совпадением `iss`.
+# Имя сервиса одинаково в любом кластере, поэтому здесь, в отличие от issuer'а,
+# уместно значение по умолчанию, а не --set.
+kcJwksUri: http://keycloak.credithub.svc.cluster.local:8080/auth/realms/credithub/protocol/openid-connect/certs
+
 # BFF - единственная точка API для фронта, поэтому он выставляется через Ingress.
 # Правило без host: обращение по IP хоста (DNS-имени у нас нет).
 ingress:
