@@ -79,6 +79,8 @@ export function AuthProvider({
   children: ReactNode;
 }) {
   const managerRef = useRef<UserManager | null>(null);
+  // Момент последнего запуска входа - см. защиту от двойного запуска в login().
+  const lastRedirectAt = useRef(0);
   // Инициализация (разбор колбэка или чтение сохранённой сессии) запускается
   // ровно один раз, а оба прохода эффекта в StrictMode ждут ОДИН и тот же промис.
   // Иначе второй проход успевал выставить isLoading=false с пустым пользователем,
@@ -177,6 +179,14 @@ export function AuthProvider({
       setError('Авторизация не настроена: в mfe-config.json нет блока auth');
       return;
     }
+    // Защита от двух запусков входа подряд (двойной клик, либо клик в момент,
+    // когда защита маршрута уже начала редирект). Два signinRedirect подряд
+    // перезаписывают сохранённое состояние, первый код становится недействителен,
+    // и пользователь видит лишний переход. Окно небольшое, поэтому честный
+    // повторный вход (например, после истечения сессии) не блокируется.
+    const now = Date.now();
+    if (now - lastRedirectAt.current < 1500) return;
+    lastRedirectAt.current = now;
     void manager.signinRedirect();
   }, []);
 
