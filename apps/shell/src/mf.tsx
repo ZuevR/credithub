@@ -6,6 +6,18 @@ import { registerRemotes, loadRemote, getInstance } from '@module-federation/run
 // `remoteEntry.js` (what every supported bundler emits at dev + build time).
 export interface MfeConfig {
   providers: Record<string, string>;
+  /**
+   * Необязательный блок авторизации: адрес Keycloak и публичный клиент shell.
+   * Если его нет, приложение работает без входа, а запросы к API получат 401 -
+   * так стенд остаётся работоспособным при неполном рантайм-конфиге.
+   */
+  auth?: {
+    authority: string;
+    clientId: string;
+    scope?: string;
+    redirectUri?: string;
+    postLogoutRedirectUri?: string;
+  };
 }
 
 let initialized = false;

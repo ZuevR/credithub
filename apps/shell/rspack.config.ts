@@ -51,6 +51,15 @@ const SHARED = Object.fromEntries(
   ])
 );
 
+// libs/auth-context объявляется общим singleton'ом: контекст React работает,
+// только если это ОДИН объект. Если каждое приложение унесёт свою копию,
+// remote получит другой контекст и токена не увидит. Версии у
+// workspace-библиотеки нет (нет package.json), поэтому requiredVersion: false -
+// иначе федерация сравнивала бы версию с пустотой.
+const SHARED_WORKSPACE = {
+  '@credithub/auth-context': { singleton: true, requiredVersion: false },
+};
+
 // Read mode from the rspack CLI arg (`--mode=development|production`) so the
 // config works the same on Windows + POSIX without depending on a shell
 // `NODE_ENV=...` prefix.
@@ -91,6 +100,10 @@ export default defineConfig((_env, argv) => {
       // to their entry files. Mirrors the `paths` in tsconfig.base.json; the
       // order matters, most specific first.
       alias: {
+        '@credithub/auth-context': path.resolve(
+          __dirname,
+          '../../libs/auth-context/src/index.ts'
+        ),
         '@credithub/design-tokens': path.resolve(
           __dirname,
           '../../libs/design-tokens/src/index.ts'
@@ -135,7 +148,7 @@ export default defineConfig((_env, argv) => {
         name: NAME,
         // No build-time `remotes:` block - registered at runtime in
         // src/mf.tsx at module load time.
-        shared: SHARED,
+        shared: { ...SHARED, ...SHARED_WORKSPACE },
       }),
     ].filter(Boolean),
   };

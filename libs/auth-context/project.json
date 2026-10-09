@@ -1,0 +1,9 @@
+{
+  "name": "auth-context",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/auth-context/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project auth-context --web",
+  "targets": {}
+}

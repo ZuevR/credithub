@@ -27,6 +27,9 @@
       "@credithub/ui": [
         "./libs/ui/src/index.ts"
       ],
+      "@credithub/auth-context": [
+        "./libs/auth-context/src/index.ts"
+      ],
       "mfe_calculator/mount": [
         "./apps/mfe-calculator/src/mount.ts"
       ]

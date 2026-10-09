@@ -24,6 +24,19 @@ providers:
   - alias: mfe-calculator
     url: /mfe/calculator/remoteEntry.mjs
 
+# Настройки OIDC для того же рантайм-конфига (блок auth). authority обязан
+# совпадать с issuer Keycloak этого стенда: он проверяется в токене, и при
+# переходе стенда на https здесь тоже https.
+#
+# redirectUri/postLogoutRedirectUri намеренно НЕ задаём: приложение берёт их из
+# origin браузера, поэтому один образ годится и для IP, и для имени хоста - лишь
+# бы origin был разрешён в клиенте realm.
+auth:
+  enabled: true
+  authority: https://192.168.1.187/auth/realms/credithub
+  clientId: shell
+  scope: openid profile email
+
 ingress:
   enabled: true
   className: traefik

@@ -18,4 +18,11 @@ data:
         {{ $provider.alias | quote }}: {{ $provider.url | quote }}
     {{- end }}
       }
+      {{- if .Values.auth.enabled }},
+      "auth": {
+        "authority": {{ .Values.auth.authority | quote }},
+        "clientId": {{ .Values.auth.clientId | quote }},
+        "scope": {{ .Values.auth.scope | quote }}
+      }
+      {{- end }}
     }

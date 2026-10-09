@@ -2,5 +2,9 @@
   "providers": {
     "mfe-credits": "http://localhost:8101/remoteEntry.js",
     "mfe-calculator": "http://localhost:8104/remoteEntry.mjs"
+  },
+  "auth": {
+    "authority": "https://192.168.1.187/auth/realms/credithub",
+    "clientId": "shell"
   }
 }

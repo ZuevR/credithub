@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import {
   AppBar,
   Box,
+  Button,
   Drawer,
   IconButton,
   List,
@@ -18,9 +19,11 @@ import MenuIcon from '@mui/icons-material/Menu';
 import PublicIcon from '@mui/icons-material/Public';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader, WidgetShell } from '@credithub/ui';
+import { useAuth } from '@credithub/auth-context';
 import { lazyProvider } from '../mf';
 import { ProviderBoundary } from './provider-boundary';
 import { ProviderMount } from './provider-mount';
+import { RequireAuth } from './require-auth';
 
 const DRAWER_WIDTH = 240;
 
@@ -118,6 +121,8 @@ export function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  // Состояние входа берём из общего контекста: тот же токен позже получит remote.
+  const auth = useAuth();
 
   const drawerContent = (
     <List component="nav" aria-label="Разделы">
@@ -151,6 +156,32 @@ export function App() {
           <Typography variant="h3" component="h1">
             CreditHub
           </Typography>
+          {/* Правая часть шапки: кто вошёл и кнопка входа/выхода. */}
+          <Box sx={{ flexGrow: 1 }} />
+          {auth.isLoading ? null : auth.isAuthenticated ? (
+            <>
+              <Typography variant="caption" sx={{ mr: 2 }}>
+                {auth.username ?? ''}
+                {auth.roles.length > 0 ? ` (${auth.roles.join(', ')})` : ''}
+              </Typography>
+              <Button color="inherit" onClick={auth.logout}>
+                Выйти
+              </Button>
+            </>
+          ) : (
+            <Button color="inherit" onClick={auth.login}>
+              Войти
+            </Button>
+          )}
+          {auth.error ? (
+            <Typography
+              variant="caption"
+              role="alert"
+              sx={{ ml: 2, maxWidth: 320 }}
+            >
+              {auth.error}
+            </Typography>
+          ) : null}
         </Toolbar>
       </AppBar>
 
@@ -188,9 +219,13 @@ export function App() {
           <Route
             path="/credits"
             element={
-              <ProviderBoundary name="mfe-credits">
-                <ProviderMfeCredits />
-              </ProviderBoundary>
+              // Данные этой страницы приходят из защищённого BFF, поэтому без
+              // сессии уводим на Keycloak и возвращаемся сюда же после входа.
+              <RequireAuth>
+                <ProviderBoundary name="mfe-credits">
+                  <ProviderMfeCredits />
+                </ProviderBoundary>
+              </RequireAuth>
             }
           />
           {/* mfe-calculator is Angular, so it exposes mount(element) instead of

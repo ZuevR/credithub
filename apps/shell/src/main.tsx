@@ -5,6 +5,7 @@ import { CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import * as ui from '@credithub/ui';
+import { AuthProvider } from '@credithub/auth-context';
 import { cssVariablesCss } from '@credithub/design-tokens';
 import { initFederation, type MfeConfig } from './mf';
 import { App } from './app/app';
@@ -63,7 +64,11 @@ async function bootstrap() {
         <CssBaseline />
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
-            <App />
+            {/* Настройки авторизации берём из того же рантайм-конфига, что и
+                адреса remote'ов: образ shell один, а Keycloak у каждого стенда свой. */}
+            <AuthProvider settings={config.auth ?? null}>
+              <App />
+            </AuthProvider>
           </BrowserRouter>
         </QueryClientProvider>
       </ThemeProvider>
