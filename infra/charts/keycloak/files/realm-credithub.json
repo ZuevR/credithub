@@ -26,7 +26,7 @@
       "publicClient": true,
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "__BASE_URL__/*"
+        "post.logout.redirect.uris": "__BASE_URL__/*##http://localhost:8100/*"
       },
       "rootUrl": "__BASE_URL__",
       "baseUrl": "/"
