@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health.controller';
 import { CoreApiModule } from '../core-api/core-api.module';
 import { CreditsModule } from '../modules/credits/credits.module';
 import { DataModule } from '../modules/data/data.module';
+import { AuthModule } from '../auth/auth.module';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { findEnvFile } from '../config/find-env-file';
 
 @Module({
@@ -14,12 +17,18 @@ import { findEnvFile } from '../config/find-env-file';
       isGlobal: true,
       envFilePath: findEnvFile(),
     }),
-    // Клиент к core-api глобальный: его используют почти все маршруты.
+    AuthModule,
     CoreApiModule,
     CreditsModule,
     DataModule,
   ],
   controllers: [AppController, HealthController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
